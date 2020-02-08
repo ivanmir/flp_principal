@@ -1,0 +1,99 @@
+ID: mta_Principal
+_schema-version: '2.1'
+parameters:
+  deploy_mode: html5-repo
+version: 0.0.1
+modules:
+  - name: mta_Principal_appRouter
+    type: approuter.nodejs
+    path: mta_Principal_appRouter
+    parameters:
+      disk-quota: 256M
+      memory: 256M
+    requires:
+      - name: mta_Principal_html5_repo_runtime
+      - name: uaa_mta_Principal
+      - name: srv_api
+        group: destinations
+        properties:
+          forwardAuthToken: true
+          strictSSL: false
+          name: srv_api
+          url: 'https://srv-api-mta-principal.cfapps.eu10.hana.ondemand.com'
+      - name: portal_resources_mta_Principal
+  - name: mta_Principal_ui_deployer
+    type: com.sap.html5.application-content
+    path: mta_Principal_ui_deployer
+    requires:
+      - name: mta_Principal_html5_repo_host
+    build-parameters:
+      requires:
+        - name: Principal
+          artifacts:
+            - './*'
+          target-path: resources/Principal
+  - name: Principal
+    type: html5
+    path: Principal
+    build-parameters:
+      builder: grunt
+      supported-platforms: []
+      build-result: dist
+  - name: srv
+    type: java
+    path: srv
+    parameters:
+      memory: 768M
+      host: srv-api-mta-principal
+      register-service-url: true
+      service-name: srv-api-mta-principal
+      service-url: '${default-url}'
+    provides:
+      - name: srv_api
+        properties:
+          url: '${default-url}'
+    build-parameters:
+      build-result: 'target/*.jar'
+    requires:
+      - name: uaa_mta_Principal
+        properties:
+          SAP_JWT_TRUST_ACL: '[{"clientid" : "*", "identityzone" : "*"}]'
+  - name: flp
+    type: com.sap.portal.content
+    path: flp
+    parameters:
+      stack: cflinuxfs3
+      memory: 256M
+      buildpack: 'https://github.com/cloudfoundry/nodejs-buildpack/releases/download/v1.6.39/nodejs-buildpack-cflinuxfs3-v1.6.39.zip'
+    requires:
+      - name: portal_resources_mta_Principal
+      - name: uaa_mta_Principal
+      - name: mta_Principal_html5_repo_host
+      - name: mta_Principal_ui_deployer
+resources:
+  - name: mta_Principal_html5_repo_runtime
+    parameters:
+      service-plan: app-runtime
+      service: html5-apps-repo
+    type: org.cloudfoundry.managed-service
+  - name: mta_Principal_html5_repo_host
+    parameters:
+      service-plan: app-host
+      service: html5-apps-repo
+    type: org.cloudfoundry.managed-service
+  - name: uaa_mta_Principal
+    parameters:
+      path: ./xs-security.json
+      service-plan: application
+      service: xsuaa
+    type: org.cloudfoundry.managed-service
+  - name: dest_mta_Principal
+    parameters:
+      service-plan: lite
+      service: destination
+    type: org.cloudfoundry.managed-service
+  - name: portal_resources_mta_Principal
+    parameters:
+      service-plan: standard
+      service: portal
+    type: org.cloudfoundry.managed-service
